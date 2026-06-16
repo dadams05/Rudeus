@@ -13,7 +13,7 @@ from discord.ext import commands, tasks
 
 
 CONFIG_FILE = "config.json"
-SCHEDULE = datetime.time(hour=19, minute=30, tzinfo=ZoneInfo(tzlocal.get_localzone_name()))
+SCHEDULE = datetime.time(hour=3, minute=30, tzinfo=ZoneInfo(tzlocal.get_localzone_name()))
 CUSTOM_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
     "Accept": "application/json"
@@ -60,7 +60,7 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 # get the word of the day
 #############################################################################################
 
-@tasks.loop(minutes=1)
+@tasks.loop(time=SCHEDULE)
 async def get_wotd():
     print("Getting words of the day...")
     # get config, return if empty
