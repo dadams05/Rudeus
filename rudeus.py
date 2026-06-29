@@ -6,6 +6,7 @@ import datetime
 import requests
 import xmltodict
 import subprocess
+from shutil import copyfile
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from discord import app_commands
@@ -15,6 +16,7 @@ from discord.ext import commands, tasks
 
 VERSION = "v1.0.0"
 CONFIG_FILE = "config.json"
+DEFAULT_CONFIG_FILE = "default.json"
 SCHEDULE = datetime.time(hour=3, minute=30, tzinfo=ZoneInfo(tzlocal.get_localzone_name()))
 CUSTOM_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -306,4 +308,10 @@ async def on_ready():
         log(f"Exception on startup: {e}")
 
 if __name__ == "__main__":
+    # create a config if there isnt one
+    try:
+        file = open(CONFIG_FILE, "r")
+    except Exception:
+        copyfile(DEFAULT_CONFIG_FILE, CONFIG_FILE)
+    # start the bot
     bot.run(TOKEN)
