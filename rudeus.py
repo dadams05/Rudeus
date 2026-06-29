@@ -5,6 +5,7 @@ import tzlocal
 import datetime
 import requests
 import xmltodict
+import subprocess
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from discord import app_commands
@@ -12,6 +13,7 @@ from bs4 import BeautifulSoup as bs
 from discord.ext import commands, tasks 
 
 
+VERSION = "v1.0.0"
 CONFIG_FILE = "config.json"
 SCHEDULE = datetime.time(hour=3, minute=30, tzinfo=ZoneInfo(tzlocal.get_localzone_name()))
 CUSTOM_HEADERS = {
@@ -47,14 +49,13 @@ MAPPING = {
 
 # load in custom environment variables
 load_dotenv()
-token = os.getenv("DISCORD_TOKEN")
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 # set up the discord bot object
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix="/", intents=intents)
-
 
 #############################################################################################
 # get the word of the day
@@ -155,6 +156,9 @@ async def get_wotd():
 # helper functions
 #############################################################################################
 
+def log(text: str) -> None:
+    print(f"[{datetime.datetime.now()}] {text}")
+
 def get_config() -> dict:
     return json.load(open(CONFIG_FILE, "r"))
 
@@ -170,6 +174,44 @@ async def has_permission(interaction: discord.Interaction, channel: discord.abc.
         )
         return False
     return True
+
+#############################################################################################
+# auto updating
+#############################################################################################
+
+@tasks.loop(time=datetime.time(hour=0, minute=0, tzinfo=ZoneInfo(tzlocal.get_localzone_name())))
+async def check_for_updates() -> None:
+    """Pull any updates from Github"""
+    log("Checking for updates.")
+
+    # get local HEAD hash
+    try:
+        local_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL).decode('utf-8').strip()
+    except Exception as e:
+        log(f"Error getting local hash: {e}")
+        return
+
+    # get remote HEAD hash
+    try:
+        response = requests.get(
+            url="https://api.github.com/repos/dadams05/Rudeus/git/ref/heads/main", 
+            headers=CUSTOM_HEADERS,
+            timeout=10,
+        )
+        response.raise_for_status() # raise error if request failed
+        remote_hash = response.json()["object"]["sha"]
+    except Exception as e:
+        log(f"Error getting remote hash: {e}")
+        return
+    
+    # call the updater.sh script
+    try:
+        if local_hash != remote_hash and get_config()["settings"]["auto-update"]:
+            log("New version of bot. Downloading update and restarting.")
+            subprocess.Popen(["./updater.sh", str(os.getpid())])
+    except Exception as e:
+        log(f"Error calling updater.sh: {e}")
+        return
 
 #############################################################################################
 # add/remove wotd
@@ -258,8 +300,10 @@ async def on_ready():
         await bot.tree.sync()
         if not get_wotd.is_running():
             get_wotd.start()
+        if get_config()["settings"]["auto-update"] and not check_for_updates.is_running():
+            check_for_updates.start()
     except Exception as e:
-        print(e)
+        log(f"Exception on startup: {e}")
 
 if __name__ == "__main__":
-    bot.run(token)
+    bot.run(TOKEN)
