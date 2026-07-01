@@ -178,11 +178,11 @@ async def has_permission(interaction: discord.Interaction, channel: discord.abc.
     return True
 
 #############################################################################################
-# auto updating
+# updating
 #############################################################################################
 
 @tasks.loop(time=datetime.time(hour=0, minute=0, tzinfo=ZoneInfo(tzlocal.get_localzone_name())))
-async def check_for_updates() -> None:
+async def auto_update() -> None:
     """Pull any updates from Github"""
     log("Checking for updates.")
 
@@ -214,6 +214,41 @@ async def check_for_updates() -> None:
     except Exception as e:
         log(f"Error calling updater.sh: {e}")
         return
+
+@bot.tree.command(name="check_for_update", description="Check for an update and install it if available")
+async def check_for_update(interaction: discord.Interaction):
+    # get local HEAD hash
+    try:
+        local_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL).decode('utf-8').strip()
+    except Exception as e:
+        log(f"Error getting local hash: {e}")
+        return
+
+    # get remote HEAD hash
+    try:
+        response = requests.get(
+            url="https://api.github.com/repos/dadams05/Rudeus/git/ref/heads/main", 
+            headers=CUSTOM_HEADERS,
+            timeout=10,
+        )
+        response.raise_for_status() # raise error if request failed
+        remote_hash = response.json()["object"]["sha"]
+    except Exception as e:
+        log(f"Error getting remote hash: {e}")
+        return
+    
+    # call the updater.sh script
+    if local_hash != remote_hash and get_config()["settings"]["auto-update"]:
+        embed = discord.Embed(
+            title="New Update Available",
+            description=f"Updating now. Please wait a moment before trying any more commands.",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        log("New version of bot. Downloading update and restarting.")
+        subprocess.Popen(["./updater.sh", str(os.getpid())])
+
 
 #############################################################################################
 # add/remove wotd
@@ -302,8 +337,8 @@ async def on_ready():
         await bot.tree.sync()
         if not get_wotd.is_running():
             get_wotd.start()
-        if get_config()["settings"]["auto-update"] and not check_for_updates.is_running():
-            check_for_updates.start()
+        if get_config()["settings"]["auto-update"] and not auto_update.is_running():
+            auto_update.start()
     except Exception as e:
         log(f"Exception on startup: {e}")
 
