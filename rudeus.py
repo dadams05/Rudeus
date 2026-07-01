@@ -345,7 +345,10 @@ async def list_config(interaction: discord.Interaction):
 
     output = ""
     for language in config["wotd"]:
-        output += f"{language} WOTD posted in:\n" + "\n".join([f"• {bot.get_channel(int(channel)).mention}" for channel in config["wotd"][language]]) + "\n\n"
+        output += (
+            f"{language} WOTD posted in:\n"
+            f"\n".join([f"• {bot.get_channel(int(channel)).mention}" for channel in config["wotd"][language]]) + "\n\n"
+        )
     
     embed = discord.Embed(
         title="Current Word of The Day Configuration",
