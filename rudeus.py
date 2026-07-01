@@ -211,6 +211,7 @@ async def auto_update() -> None:
         if local_hash != remote_hash and get_config()["settings"]["auto-update"]:
             log("New version of bot. Downloading update and restarting.")
             subprocess.Popen(["./updater.sh", str(os.getpid())])
+            await bot.close()
     except Exception as e:
         log(f"Error calling updater.sh: {e}")
         return
@@ -248,6 +249,7 @@ async def check_for_update(interaction: discord.Interaction):
 
         log("New version of bot. Downloading update and restarting.")
         subprocess.Popen(["./updater.sh", str(os.getpid())])
+        await bot.close()
     else:
         embed = discord.Embed(
             title="Up To Date",
