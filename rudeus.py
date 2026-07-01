@@ -248,6 +248,13 @@ async def check_for_update(interaction: discord.Interaction):
 
         log("New version of bot. Downloading update and restarting.")
         subprocess.Popen(["./updater.sh", str(os.getpid())])
+    else:
+        embed = discord.Embed(
+            title="Up To Date",
+            description=f"Current Version: {VERSION}",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 #############################################################################################
