@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup as bs
 from discord.ext import commands, tasks 
 
 
-VERSION = "v1.0.0"
+VERSION = "v1.0.1"
 CONFIG_FILE = "config.json"
 DEFAULT_CONFIG_FILE = "default.json"
 SCHEDULE = datetime.time(hour=3, minute=30, tzinfo=ZoneInfo(tzlocal.get_localzone_name()))
