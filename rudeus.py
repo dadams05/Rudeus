@@ -256,7 +256,6 @@ async def check_for_update(interaction: discord.Interaction):
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-
 #############################################################################################
 # add/remove wotd
 #############################################################################################
@@ -333,6 +332,26 @@ async def remove_wotd_autocomplete(interaction: discord.Interaction, current: st
         discord.app_commands.Choice(name=lang, value=lang)
         for lang in active_languages if current.lower() in lang.lower()
     ][:25]
+
+#############################################################################################
+# config
+#############################################################################################
+
+@bot.tree.command(name="list_config", description="List the current languages/channels configuration")
+async def list_config(interaction: discord.Interaction):
+    config = get_config()
+
+    output = ""
+    for language in config["wotd"]:
+        output += f"{language} WOTD posted in:\n" + "\n".join([f"• {bot.get_channel(int(channel)).mention}" for channel in config["wotd"][language]]) + "\n\n"
+    
+    embed = discord.Embed(
+        title="Current Word of The Day Configuration",
+        description=output,
+        color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 #############################################################################################
 # main functions
