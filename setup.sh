@@ -3,9 +3,9 @@
 # Exit immediately if any command fails
 set -e
 
-echo "=========================================="
-echo "Starting Rudeus Bot Environment Setup..."
-echo "=========================================="
+echo "====================================="
+echo "Starting Rudeus Bot Environment Setup"
+echo "====================================="
 
 # 1. Install system prerequisites if missing (python3-venv and screen)
 echo "[1/4] Checking system dependencies..."
@@ -44,10 +44,10 @@ fi
 echo "[4/4] Launching the bot in a detached screen session named 'rudeus'..."
 screen -dmS rudeus .venv/bin/python rudeus.py
 
-echo "=========================================="
-echo "Setup Successful!"
-echo "=========================================="
+echo "====================================="
+echo "Setup Successful"
+echo "====================================="
 echo "-> Your bot is now running in the background."
 echo "-> To view the live bot logs/console, run: screen -r rudeus"
 echo "-> To exit the screen without killing the bot, press: Ctrl + A, then D"
-echo "=========================================="
+echo "====================================="
