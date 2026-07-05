@@ -16,16 +16,21 @@ from discord import app_commands
 from bs4 import BeautifulSoup as bs
 from discord.ext import commands, tasks 
 
+# ==========================================
+# CONSTANTS & CONFIGURATION INITIALIZATION
+# ==========================================
 
-VERSION = "v1.1.0"
+VERSION = "v1.2.0"
 CONFIG_FILE = "config.json"
 DEFAULT_CONFIG_FILE = "default.json"
 START = datetime.datetime.now()
 SCHEDULE = datetime.time(hour=3, minute=30, tzinfo=ZoneInfo(tzlocal.get_localzone_name()))
+
 CUSTOM_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
     "Accept": "application/json"
 }
+
 MAPPING = {
     "Arabic": "https://wotd.transparent.com/rss/arabic-widget.xml",
     "Chinese": "https://wotd.transparent.com/rss/zh-widget.xml",
@@ -53,43 +58,44 @@ MAPPING = {
     "Urdu": "https://wotd.transparent.com/rss/urdu-widget.xml"
 }
 
-# load in custom environment variables
+# load environmental variables
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-# set up the discord bot object
+# bot framework initialization
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-#############################################################################################
-# get the word of the day
-#############################################################################################
+# ==========================================
+# CORE BACKING LOOPS
+# ==========================================
 
 @tasks.loop(time=SCHEDULE)
 async def get_wotd() -> None:
-    # get config, return if empty
+    """Processes RSS feeds, downloads audio components, and posts the Word of the Day."""
     config = get_config()
-    if not config.get("wotd"): return
+    if not config.get("wotd"): 
+        return
+        
     log("Getting words of the day")
     
-    # start going through languages
     for language in config["wotd"]:
-        # skip language if no channels post it
-        if not config["wotd"][language]: continue
+        if not config["wotd"][language]: 
+            continue
+            
         try:
-            # get the data
+            # Offload blocking HTTP calls to avoid locking up core execution
             loop = asyncio.get_running_loop()
             response = await loop.run_in_executor(None, lambda: requests.get(MAPPING[language], headers=CUSTOM_HEADERS))
             soup = bs(response.text, "html.parser")
             wotd = xmltodict.parse(soup.find("words").prettify())["words"]
 
-            # create the audio file names
             word_file_path = f"./word_{language}.mp3"
             phrase_file_path = f"./phrase_{language}.mp3"
 
-            # download word audio file
+            # Async execution for core sound files
             w_res = await loop.run_in_executor(None, lambda: requests.get(wotd["wordsound"], headers=CUSTOM_HEADERS))
             if w_res.status_code == 200:
                 with open(word_file_path, "wb") as file:
@@ -98,7 +104,6 @@ async def get_wotd() -> None:
                 word_file_path = None
                 log(f"Failed downloading word sound for {language}. Status: {w_res.status_code}")
 
-            # download phrase audio file
             p_res = await loop.run_in_executor(None, lambda: requests.get(wotd["phrasesound"], headers=CUSTOM_HEADERS))
             if p_res.status_code == 200:
                 with open(phrase_file_path, "wb") as file:
@@ -107,7 +112,7 @@ async def get_wotd() -> None:
                 phrase_file_path = None
                 log(f"Failed downloading phrase sound for {language}. Status: {p_res.status_code}")
 
-            # set up the description
+            # Construct clean embed payload data
             description_parts = [f"# {wotd['word']}"]
             if wotd.get("wotd:transliteratedword"):
                 description_parts.append(f"*{wotd['wotd:transliteratedword']}*")
@@ -122,17 +127,15 @@ async def get_wotd() -> None:
             description_parts.append(f"> {wotd['enphrase']}\n")
             description = "\n".join(description_parts)
 
-            # build the embed
             embed = discord.Embed(
                 title=f"{language} Word of the Day",
                 description=description,
                 color=discord.Color.gold()
             )
-            embed.set_author(name=f"[{wotd["date"]}]")
+            embed.set_author(name=f"[{wotd['date']}]")
 
-            # send the embed to the corresponding channels
+            # Route messages out to registered guild configurations
             for channel_id in config["wotd"][language]:
-                # memory cache check first, fall back to API fetch if memory is empty
                 channel = bot.get_channel(int(channel_id))
                 if not channel:
                     try:
@@ -141,7 +144,6 @@ async def get_wotd() -> None:
                         print(f"Could not locate channel ID {channel_id}")
                         continue
 
-                # append attachments only if files exist
                 try:
                     attachments = []
                     if word_file_path and os.path.exists(word_file_path):
@@ -152,7 +154,7 @@ async def get_wotd() -> None:
                 except Exception as e:
                     print(f"Error sending {language} to channel {channel_id}: {e}")
 
-            # clean up audio files inside the loop so they are wiped immediately after use
+            # Post clean-up logic executed per iteration
             if word_file_path and os.path.exists(word_file_path):
                 os.remove(word_file_path)
             if phrase_file_path and os.path.exists(phrase_file_path):
@@ -161,31 +163,40 @@ async def get_wotd() -> None:
         except Exception as loop_error:
             print(f"Skipping language {language} due to processing error: {loop_error}")
 
+# ==========================================
+# TIME RECONFIGURATION COMMANDS
+# ==========================================
+
 @bot.tree.command(name="set_post_time", description="Set the time at which the bot post the Word(s) of the Day")
 @app_commands.describe(time_input="When should the bot post? (e.g., '3:30 PM', '21:00', 'midnight')")
 async def set_post_time(interaction: discord.Interaction, time_input: str):
-    # parse the string into a full datetime object relative to current time
     parsed_datetime = dateparser.parse(time_input)
     if parsed_datetime is None:
-        embed = discord.Embed(title="Error", description="Could not figure out what time you meant. Try something like `3:30 PM` or `18:45`.", color=discord.Color.red())
+        embed = discord.Embed(
+            title="Error", 
+            description="Could not figure out what time you meant. Try something like `3:30 PM` or `18:45`.", 
+            color=discord.Color.red()
+        )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
-    # extract just the time portion (hour, minute, second)
+        
     parsed_time = parsed_datetime.time()
-    # update the config file
+    
     config = get_config()
     config["settings"]["post-time"] = str(parsed_time)
     save_config(config)
-    # update the function
+    
     try:
         local_tz = ZoneInfo(tzlocal.get_localzone_name())
         loop_time = parsed_time.replace(tzinfo=local_tz)
+        
         get_wotd.change_interval(time=loop_time)
         if get_wotd.is_running():
             get_wotd.restart()
+            
         log(f"Successfully adjusted background loop interval to {loop_time}")
     except Exception as e:
         log(f"Failed to dynamically adjust loop time: {e}")
-    # send the success message
+        
     embed = discord.Embed(
         title="Success", 
         description=f"Word(s) of the Day will be posted daily at **{parsed_time.strftime('%I:%M %p')}**", 
@@ -193,9 +204,9 @@ async def set_post_time(interaction: discord.Interaction, time_input: str):
     )
     return await interaction.response.send_message(embed=embed, ephemeral=True)
 
-#############################################################################################
-# helper functions
-#############################################################################################
+# ==========================================
+# PERSISTENT STORAGE CORE HELPERS
+# ==========================================
 
 def log(text: str) -> None:
     print(f"[{datetime.datetime.now()}] {text}")
@@ -219,43 +230,36 @@ async def has_permission(interaction: discord.Interaction, channel: discord.abc.
     return True
 
 def get_versions() -> tuple[str | None, str | None]:
-    # get local HEAD hash
+    """Interrogates Git and the GitHub api tracking branch divergences."""
     try:
         local_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL).decode('utf-8').strip()
     except Exception as e:
         log(f"Error getting local hash: {e}")
-        return None, None
+        local_hash = None
 
-    # get remote HEAD hash
     try:
         response = requests.get(
             url="https://api.github.com/repos/dadams05/Rudeus/git/ref/heads/main", 
             headers=CUSTOM_HEADERS,
             timeout=10,
         )
-        response.raise_for_status() # raise error if request failed
+        response.raise_for_status()
         remote_hash = response.json()["object"]["sha"]
     except Exception as e:
         log(f"Error getting remote hash: {e}")
-        return None, None
+        remote_hash = None
     
-    # return both versions
     return local_hash, remote_hash
 
 def merge_defaults(default: dict, user_config: dict) -> tuple[dict, bool]:
-    """
-    Recursively merges default config keys into user config.
-    Returns the updated user config and a boolean indicating if changes were made.
-    """
+    """Recursively resolves downstream key updates without disrupting customized configurations."""
     has_changes = False
     
     for key, value in default.items():
         if key not in user_config:
-            # Key is completely missing in user config, add it
             user_config[key] = value
             has_changes = True
         elif isinstance(value, dict) and isinstance(user_config[key], dict):
-            # Key exists in both and is a dictionary, merge deeper
             deep_config, deep_changes = merge_defaults(value, user_config[key])
             if deep_changes:
                 user_config[key] = deep_config
@@ -263,14 +267,17 @@ def merge_defaults(default: dict, user_config: dict) -> tuple[dict, bool]:
                 
     return user_config, has_changes
 
-#############################################################################################
-# updating
-#############################################################################################
+# ==========================================
+# SYSTEM AUTOMATION UPDATE ENDPOINTS
+# ==========================================
 
 @tasks.loop(time=datetime.time(hour=0, minute=0, tzinfo=ZoneInfo(tzlocal.get_localzone_name())))
 async def auto_update() -> None:
     log("Checking for updates.")
     local, remote = get_versions()
+    if not local or not remote:
+        return
+
     try:
         if local != remote and get_config()["settings"]["auto-update"]:
             log("New version of bot. Downloading update and restarting.")
@@ -278,19 +285,29 @@ async def auto_update() -> None:
             await bot.close()
     except Exception as e:
         log(f"Error auto updating: {e}")
-        return
 
 @bot.tree.command(name="check_for_update", description="Check for an update and install it if available")
 async def check_for_update(interaction: discord.Interaction):
+    # Defer interaction payload parsing so external git operations don't trigger command failure status
+    await interaction.response.defer(ephemeral=True)
+    
     local, remote = get_versions()
+    if not local or not remote:
+        embed = discord.Embed(
+            title="Update Error",
+            description="Unable to reach local git repository or remote version control tracking data.",
+            color=discord.Color.red()
+        )
+        return await interaction.followup.send(embed=embed, ephemeral=True)
+
     try:
         if local != remote:
             embed = discord.Embed(
                 title="New Update Available",
-                description=f"Updating now. Please wait a moment before trying any more commands.",
+                description="Updating now. Please wait a moment before trying any more commands.",
                 color=discord.Color.green()
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
             log("New version of bot. Downloading update and restarting.")
             subprocess.Popen(["./updater.sh", str(os.getpid())])
@@ -301,19 +318,17 @@ async def check_for_update(interaction: discord.Interaction):
                 description=f"Current Version: {VERSION}",
                 color=discord.Color.green()
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
     except Exception as e:
         log(f"Error updating: {e}")
-        return
 
 @bot.tree.command(name="set_auto_update", description="Turn auto-updating on/off")
 @app_commands.describe(value="on/off")
 async def set_auto_update(interaction: discord.Interaction, value: Literal["on", "off"]):
-    # change auto-update
     config = get_config()
     config["settings"]["auto-update"] = True if value == "on" else False
     save_config(config)
-    # send the success message
+    
     embed = discord.Embed(
         title="Success",
         description=f"Auto-updating has been turned {value}",
@@ -321,21 +336,20 @@ async def set_auto_update(interaction: discord.Interaction, value: Literal["on",
     )
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-#############################################################################################
-# add/remove wotd
-#############################################################################################
+# ==========================================
+# SERVER GUILD CHANNEL ASSIGNMENTS
+# ==========================================
 
 @bot.tree.command(name="add_wotd", description="Add a Word of the Day to a channel")
 @app_commands.describe(channel="The channel to post updates to", language="The language to assign")
 async def add_wotd(interaction: discord.Interaction, channel: discord.TextChannel | discord.VoiceChannel, language: str):
-    # make sure given language is valid
     if language not in MAPPING:
         embed = discord.Embed(title="Error", description="Invalid language selection", color=discord.Color.red())
         return await interaction.response.send_message(embed=embed, ephemeral=True)
-    # check for channel perms
+        
     if not await has_permission(interaction, channel): 
         return
-    # add the language into the config
+        
     channel_id = str(channel.id)
     config = get_config()
     if language not in config["wotd"]:
@@ -343,7 +357,7 @@ async def add_wotd(interaction: discord.Interaction, channel: discord.TextChanne
     if channel_id not in config["wotd"][language]:
         config["wotd"][language].append(channel_id)
     save_config(config)
-    # send the success message
+    
     embed = discord.Embed(
         title="Success",
         description=f"{channel.mention} will now post the **{language}** Word of the Day.",
@@ -364,7 +378,6 @@ async def remove_wotd(interaction: discord.Interaction, channel: discord.TextCha
     channel_id = str(channel.id)
     config = get_config()
     
-    # check if the language is actually even posted
     if language not in config["wotd"] or channel_id not in config["wotd"][language]:
         embed = discord.Embed(
             title="Not Found",
@@ -372,15 +385,15 @@ async def remove_wotd(interaction: discord.Interaction, channel: discord.TextCha
             color=discord.Color.red()
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
-    # check perms
+        
     if not await has_permission(interaction, channel): 
         return
-    # remove the language from the config
+        
     config["wotd"][language].remove(channel_id)
     if not config["wotd"][language]:
         config["wotd"].pop(language)
     save_config(config)
-    # send the success message
+    
     embed = discord.Embed(
         title="Success",
         description=f"{channel.mention} will no longer post the **{language}** Word of the Day.",
@@ -397,25 +410,21 @@ async def remove_wotd_autocomplete(interaction: discord.Interaction, current: st
         for lang in active_languages if current.lower() in lang.lower()
     ][:25]
 
-#############################################################################################
-# information functions
-#############################################################################################
+# ==========================================
+# DIAGNOSTIC SYSTEM INFRASTRUCTURE COMMANDS
+# ==========================================
 
 @bot.tree.command(name="show_config", description="List the current languages/channels configuration")
 async def show_config(interaction: discord.Interaction):
     config = get_config()
-
     output = ""
+    
     for language, channels in config["wotd"].items():
         channel_list = []
         for channel_id in channels:
             channel = bot.get_channel(int(channel_id))
-            if channel:
-                channel_list.append(f"• {channel.mention}")
-            else:
-                channel_list.append(f"• #deleted-channel ({channel_id})")
-        channels_text = "\n".join(channel_list)
-        output += f"**{language}** WOTD posted in:\n{channels_text}\n\n"
+            channel_list.append(f"• {channel.mention}" if channel else f"• #deleted-channel ({channel_id})")
+        output += f"**{language}** WOTD posted in:\n{'\n'.join(channel_list)}\n\n"
     
     if not output:
         output = "No Words of the Day have been configured"
@@ -429,14 +438,13 @@ async def show_config(interaction: discord.Interaction):
 
 @bot.tree.command(name="clear_config", description="Clear current Word of the Day configuration")
 async def clear_config(interaction: discord.Interaction):
-    # clear out the configuration
     config = get_config()
     config["wotd"].clear()
     save_config(config)
-    # send the success message
+    
     embed = discord.Embed(
         title="Success",
-        description=f"Configuration has been cleared/reset. No words will be posted now.",
+        description="Configuration has been cleared/reset. No words will be posted now.",
         color=discord.Color.green()
     )
     await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -450,14 +458,14 @@ async def info(interaction: discord.Interaction):
     config = get_config()
 
     description = (
-            f"__**Version**__: {VERSION}\n"
-            f"__**Uptime**__: {hours}:{minutes:02}:{seconds:02}\n"
-            f"__**Autoupdate**__: {config['settings']['auto-update']}\n"
-            f"__**Post Time**__: Currently configured to post at {get_wotd.time[0].strftime('%I:%M %p')}\n\n"
-            f"Rudeus is a bot that posts words of the day from other languages. You can configure it "
-            f"to post words in designated channels and choose which languages are posted. The words are pulled from:\n"
-            f"https://www.transparent.com/word-of-the-day."
-        )
+        f"__**Version**__: {VERSION}\n"
+        f"__**Uptime**__: {hours}:{minutes:02}:{seconds:02}\n"
+        f"__**Autoupdate**__: {config['settings']['auto-update']}\n"
+        f"__**Post Time**__: Currently configured to post at {get_wotd.time[0].strftime('%I:%M %p')}\n\n"
+        f"Rudeus is a bot that posts words of the day from other languages. You can configure it "
+        f"to post words in designated channels and choose which languages are posted. The words are pulled from:\n"
+        f"https://www.transparent.com/word-of-the-day."
+    )
     
     embed = discord.Embed(
         title="Rudeus",
@@ -470,21 +478,22 @@ async def info(interaction: discord.Interaction):
     col1 = "\n".join(f"• {lang}" for lang in languages[:per_col])
     col2 = "\n".join(f"• {lang}" for lang in languages[per_col:per_col*2])
     col3 = "\n".join(f"• {lang}" for lang in languages[per_col*2:])
+    
     embed.add_field(name="__Available Languages__", value=col1, inline=True)
-    embed.add_field(name="\u200b", value=col2, inline=True)  # \u200b is an invisible character for a blank header
+    embed.add_field(name="\u200b", value=col2, inline=True)
     embed.add_field(name="\u200b", value=col3, inline=True)
    
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-#############################################################################################
-# main functions
-#############################################################################################
+# ==========================================
+# GATEWAY CLIENT HANDLERS & BOT ENTRY
+# ==========================================
 
 @bot.event
 async def on_ready():
+    """Triggers looping configurations smoothly on basic initialization validation."""
     try:
         await bot.tree.sync()
-
         if not get_wotd.is_running():
             get_wotd.start()
         if get_config()["settings"]["auto-update"] and not auto_update.is_running():
@@ -493,7 +502,7 @@ async def on_ready():
         log(f"Exception on startup: {e}")
 
 if __name__ == "__main__":
-    # Ensure config.json exists
+    # Ensure raw user profile storage baseline exists
     try:
         with open(CONFIG_FILE, "r") as f:
             pass
@@ -501,7 +510,7 @@ if __name__ == "__main__":
         log("No config found. Creating config.json from default.json.")
         copyfile(DEFAULT_CONFIG_FILE, CONFIG_FILE)
 
-    # Clean Merge Step: Sync any new keys added to default.json
+    # Reconcile properties to downstream targets dynamically
     try:
         with open(DEFAULT_CONFIG_FILE, "r") as f:
             default_data = json.load(f)
@@ -509,12 +518,10 @@ if __name__ == "__main__":
         with open(CONFIG_FILE, "r") as f:
             user_data = json.load(f)
             
-        # Run our smart merge
         updated_config, changes_detected = merge_defaults(default_data, user_data)
         
         if changes_detected:
             log("Detected new schema updates in default.json. Migrating config.json safely...")
-            # Reuse your existing save_config logic, or save directly:
             with open(CONFIG_FILE, "w") as f:
                 json.dump(updated_config, f, indent=4)
             log("Migration complete.")
@@ -522,21 +529,18 @@ if __name__ == "__main__":
     except Exception as e:
         log(f"Critical error checking or migrating configuration files: {e}")
 
+    # Set specific timing objects inside the global system configuration scope
     config = get_config()
     config_time_str = config["settings"].get("post-time") 
     if config_time_str:
         try:
-            # convert string back into a naive time object
             parsed_time = datetime.time.fromisoformat(config_time_str)
-            # apply your local timezone context
             local_tz = ZoneInfo(tzlocal.get_localzone_name())
             startup_schedule = parsed_time.replace(tzinfo=local_tz)
             
-            # apply the loaded time to the loop before it starts running
             get_wotd.change_interval(time=startup_schedule)
             log(f"Loaded post-time from config: {startup_schedule}")
         except Exception as e:
             log(f"Error parsing startup config post-time, using default fallback: {e}")
 
-    # Start the bot
     bot.run(TOKEN)
