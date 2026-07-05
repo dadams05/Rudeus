@@ -20,7 +20,7 @@ from discord.ext import commands, tasks
 # CONSTANTS & CONFIGURATION INITIALIZATION
 # ==========================================
 
-VERSION = "v1.1.0"
+VERSION = "v1.2.0"
 CONFIG_FILE = "config.json"
 DEFAULT_CONFIG_FILE = "default.json"
 START = datetime.datetime.now()
