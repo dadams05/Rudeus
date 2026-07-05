@@ -1,5 +1,6 @@
 # Rudeus
-A self-hostable Discord bot for posting a Word of the Day in various languages
+
+A self-hostable Discord bot for posting a Word of the Day in various languages.
 
 ## Features
 
@@ -18,54 +19,72 @@ A self-hostable Discord bot for posting a Word of the Day in various languages
 
 Make sure your Raspberry Pi or Linux setup has these installed:
 
-* Python 3.10 or newer
-* `python3-venv` and `python3-pip`
-* `git`
-* `screen`
+```bash
+sudo apt update
+sudo apt install python3-venv python3-pip git screen -y
+```
 
 ## Installation and Deployment
 
-Follow these steps to get Rudeus running:
+Follow these steps to get Rudeus manually configured and running:
 
-1. Download the code to your local folder:
+### 1. Download the Code
+
+Clone the repository and enter the directory:
 
 ```bash
 git clone https://github.com/dadams05/Rudeus.git
 cd Rudeus
 ```
 
-2. Set up your Discord token. Create a `.env` file in the main folder, or rename `.env.example` to `.env`, and add your API key:
+### 2. Set Up the Environment & Dependencies
+
+Create a Python virtual environment and install the required packages:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/pip install --upgrade pip
+./.venv/bin/pip install -r requirements.txt
+```
+
+### 3. Add Your Discord Token
+
+Create a `.env` file in the main folder (or rename `.env.example` to `.env`) and add your Discord bot token:
 
 ```env
 DISCORD_TOKEN=your_secret_bot_token_here
 ```
 
-3. Make the setup script runnable (if it isn't already):
+### 4. Make the Updater Executable
+
+Ensure the auto-updater has permission to run when triggered by the bot:
 
 ```bash
-chmod +x setup.sh
+chmod +x updater.sh
 ```
 
-4. Run the setup script:
+### 5. Launch the Bot inside Screen
+
+Create a new background window named `rudeus` and launch the bot inside it:
 
 ```bash
-./setup.sh
+screen -S rudeus ./.venv/bin/python rudeus.py
 ```
 
-The `setup.sh` script installs any missing packages, creates a virtual environment, installs the Python requirements, and starts the bot in the background for you.
+*(Once it boots up successfully, you can leave it running in the background by pressing `Ctrl + A`, then `D`)*.
 
 ## Managing the Bot Process
 
-Because the bot runs in a `screen` session in the background, you will use these commands to interact with it in your terminal:
+Because the bot runs in a dedicated `screen` session, you will use these commands to manage it in your terminal:
 
-* **View the Bot's Console**: See the live logs and what the bot is doing right now:
+* **View the Bot's Console / Logs**: See what the bot is doing right now:
 
 ```bash
-screen -r <rudeus or whatever you named the session>
+screen -r rudeus
 ```
 
-* **Leave the Console (Safely)**: To exit the view without killing the bot, press `Ctrl + A`, then press the `D` key.
-* **Kill the Bot**: Completely stop the bot from running:
+* **Leave the Console Safely**: To hide the console view without shutting down the bot, press `Ctrl + A`, then press the `D` key on your keyboard.
+* **Kill the Bot**: Completely stop the bot process from your main terminal:
 
 ```bash
 screen -X -S rudeus quit
