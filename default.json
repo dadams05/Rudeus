@@ -1,6 +1,7 @@
 {
     "settings": {
-        "auto-update": true
+        "auto-update": true,
+        "post-time": "03:30:00"
     },
     "wotd": {}
 }
