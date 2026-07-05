@@ -2,7 +2,7 @@
 
 A self-hostable Discord bot for posting a Word of the Day in various languages.
 
-![rudy and co](images/banner_2k.png) 
+![rudy and co](images/banner_2k.png)  
 
 ## Contents
 
@@ -12,7 +12,7 @@ A self-hostable Discord bot for posting a Word of the Day in various languages.
 * [Discord Developer Portal Setup](#discord-developer-portal-setup)
 * [Installation and Deployment](#installation-and-deployment)
 * [Managing the Bot Process](#managing-the-bot-process)
-* [Chat Commands Reference](#chat-commands-reference)
+* [Chat Commands Reference](#chat-commands-reference) 
 
 ## Features
 
@@ -23,8 +23,8 @@ A self-hostable Discord bot for posting a Word of the Day in various languages.
 
 ## Technical Design Notes
 
-* **Made for Raspberry Pi**: Built and tested specifically for Raspberry Pi (Linux). Other operating systems require separate configuration.
-* **Background Execution**: Runs inside a GNU `screen` session named `rudeus` so it can stay live and auto-restart cleanly.
+* **Made for Raspberry Pi**: Built and tested on a Raspberry Pi (Linux). Other systems will require a different setup not discussed here.
+* **Background Execution**: Designed to run inside a GNU `screen` session so it can stay live and auto-restart cleanly.
 * **Auto-Updates**: Disabled by default. Can be toggled on via chat command or checked manually.
 
 ## System Prerequisites
@@ -63,16 +63,30 @@ python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
 ```
 
-### 2. Configure Credentials & Permissions
+Here is the trimmed down, straight-to-the-point version:
 
-Create a `.env` file from the example template and paste your Discord bot token inside it:
+### 2. Set Up Your Discord Token
+
+To connect the bot to Discord, create a `.env` file using one of these two options:
+
+#### Option A: Copy the template file
 
 ```bash
 cp .env.example .env
-nano .env  # Paste your token into: DISCORD_TOKEN=your_token_here
+nano .env
 ```
 
-Give the update script execution permissions:
+Replace the dummy token with your real one: `DISCORD_TOKEN=your_actual_token_here`.
+
+#### Option B: Create a new file directly
+
+```bash
+nano .env
+```
+
+Type out your token line exactly like this: `DISCORD_TOKEN=your_actual_token_here`.
+
+Finally, make sure the update script has permission to execute:
 
 ```bash
 chmod +x updater.sh
@@ -80,13 +94,19 @@ chmod +x updater.sh
 
 ### 3. Launch Inside Screen
 
-Start the bot inside a background window named `rudeus`:
+To ensure the bot stays open in the background and can safely restart itself during updates, you must create the `screen` terminal *before* running the script:
 
+1. Open a new background terminal session named `rudeus`:
 ```bash
-screen -S rudeus ./.venv/bin/python rudeus.py
+screen -S rudeus
 ```
 
-*To leave the bot running in the background, press `Ctrl + A`, then `D` to detach.*
+2. Now, inside this new terminal window, run the bot using your virtual environment:
+```bash
+./.venv/bin/python rudeus.py
+```
+
+3. Once the bot successfully turns on, leave it running in the background by detaching from the window. Press **`Ctrl + A`**, then press **`D`**.
 
 ## Managing the Bot Process
 
