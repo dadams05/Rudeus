@@ -63,8 +63,6 @@ python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
 ```
 
-Here is the trimmed down, straight-to-the-point version:
-
 ### 2. Set Up Your Discord Token
 
 To connect the bot to Discord, create a `.env` file using one of these two options:
