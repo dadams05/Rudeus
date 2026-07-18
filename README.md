@@ -7,7 +7,8 @@ A self-hostable Discord bot for posting a Word of the Day in various languages.
 ## Contents
 
 * [Features](#features)
-* [Technical Design Notes](#technical-design-notes)
+* [Supported Langauges](#supported-languages)
+* [Technical Notes](#technical-notes)
 * [System Prerequisites](#system-prerequisites)
 * [Discord Developer Portal Setup](#discord-developer-portal-setup)
 * [Installation and Deployment](#installation-and-deployment)
@@ -16,14 +17,41 @@ A self-hostable Discord bot for posting a Word of the Day in various languages.
 
 ## Features
 
-* **Multi-Language Support**: Choose from 24 different languages to post in your server.
+* **Multi-Language Support**: Choose from several different languages to post in your server.
 * **Pronunciation Media**: Automatically downloads and attaches MP3 files so you can hear how the word and example phrase sound.
 * **Flexible Scheduling**: Customize the post time using natural phrases (e.g., "3:30 PM", "midnight") directly in chat.
 * **Built-in Updates**: Can download updates from GitHub and automatically restart itself.
 
-## Technical Design Notes
+## Supported Languages
 
-* **Made for Raspberry Pi**: Built and tested on a Raspberry Pi (Linux). Other systems will require a different setup not discussed here.
+* Arabic
+* Chinese
+* Dari
+* Dutch
+* Esperanto
+* French
+* German
+* Hebrew
+* Hindi
+* Indonesian
+* Irish
+* Italian
+* Japanese
+* Korean
+* Latin
+* Norwegian
+* Pashto
+* Polish
+* Portuguese
+* Russian
+* Spanish
+* Swedish
+* Turkish
+* Urdu
+
+## Technical Notes
+
+* **Designed for Raspberry Pi**: Built and tested on a Raspberry Pi (Linux). Other systems will require a different setup not discussed here.
 * **Background Execution**: Designed to run inside a GNU `screen` session so it can stay live and auto-restart cleanly.
 * **Auto-Updates**: Disabled by default. Can be toggled on via chat command or checked manually.
 
